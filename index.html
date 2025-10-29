@@ -1,0 +1,696 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Ride Request App - RabbitMQ vs SQS</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen', 'Ubuntu', 'Cantarell', sans-serif;
+            background: #0f0f23;
+            background-image:
+                radial-gradient(at 47% 33%, hsl(240, 70%, 15%) 0, transparent 59%),
+                radial-gradient(at 82% 65%, hsl(280, 60%, 15%) 0, transparent 55%);
+            min-height: 100vh;
+            padding: 40px 20px;
+            color: #e0e0e0;
+        }
+
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+        }
+
+        h1 {
+            text-align: center;
+            color: #ffffff;
+            margin-bottom: 40px;
+            font-size: 2.5em;
+            font-weight: 600;
+            letter-spacing: -0.5px;
+        }
+
+        .main-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 24px;
+            margin-bottom: 24px;
+        }
+
+        .card {
+            background: rgba(26, 27, 38, 0.8);
+            backdrop-filter: blur(10px);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            border-radius: 16px;
+            padding: 28px;
+            box-shadow:
+                0 8px 32px rgba(0, 0, 0, 0.4),
+                0 2px 8px rgba(0, 0, 0, 0.3),
+                inset 0 1px 0 rgba(255, 255, 255, 0.05);
+            transition: all 0.3s ease;
+        }
+
+        .card:hover {
+            transform: translateY(-2px);
+            box-shadow:
+                0 12px 40px rgba(0, 0, 0, 0.5),
+                0 4px 12px rgba(0, 0, 0, 0.4),
+                inset 0 1px 0 rgba(255, 255, 255, 0.08);
+        }
+
+        .full-width {
+            grid-column: 1 / -1;
+        }
+
+        h2 {
+            color: #ffffff;
+            margin-bottom: 24px;
+            font-size: 1.4em;
+            font-weight: 600;
+            letter-spacing: -0.3px;
+        }
+
+        .form-group {
+            margin-bottom: 18px;
+        }
+
+        label {
+            display: block;
+            margin-bottom: 8px;
+            color: #b0b0b0;
+            font-size: 0.9em;
+            font-weight: 500;
+            letter-spacing: 0.3px;
+        }
+
+        input,
+        select,
+        textarea {
+            width: 100%;
+            padding: 12px 16px;
+            background: rgba(15, 15, 35, 0.6);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            border-radius: 10px;
+            font-size: 14px;
+            color: #e0e0e0;
+            transition: all 0.3s;
+            box-shadow: inset 0 2px 4px rgba(0, 0, 0, 0.2);
+        }
+
+        input::placeholder {
+            color: #606060;
+        }
+
+        input:focus,
+        select:focus,
+        textarea:focus {
+            outline: none;
+            border-color: rgba(102, 126, 234, 0.5);
+            background: rgba(15, 15, 35, 0.8);
+            box-shadow:
+                inset 0 2px 4px rgba(0, 0, 0, 0.3),
+                0 0 0 3px rgba(102, 126, 234, 0.1);
+        }
+
+        .button-group {
+            display: flex;
+            gap: 12px;
+            margin-top: 24px;
+        }
+
+        button {
+            flex: 1;
+            padding: 14px 24px;
+            border: none;
+            border-radius: 10px;
+            font-size: 15px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s;
+            box-shadow:
+                0 4px 12px rgba(0, 0, 0, 0.3),
+                0 2px 4px rgba(0, 0, 0, 0.2);
+            letter-spacing: 0.3px;
+            border: 1px solid rgba(255, 255, 255, 0.1);
+        }
+
+        .btn-rabbitmq {
+            background: rgba(255, 107, 53, 0.15);
+            color: #ff8f6b;
+            border-color: rgba(255, 107, 53, 0.3);
+        }
+
+        .btn-rabbitmq:hover {
+            background: rgba(255, 107, 53, 0.25);
+            color: #ffa485;
+            border-color: rgba(255, 107, 53, 0.5);
+            transform: translateY(-2px);
+            box-shadow:
+                0 6px 20px rgba(255, 107, 53, 0.3),
+                0 4px 8px rgba(0, 0, 0, 0.3);
+        }
+
+        .btn-sqs {
+            background: rgba(78, 205, 196, 0.15);
+            color: #5ed7ce;
+            border-color: rgba(78, 205, 196, 0.3);
+        }
+
+        .btn-sqs:hover {
+            background: rgba(78, 205, 196, 0.25);
+            color: #7ee4dc;
+            border-color: rgba(78, 205, 196, 0.5);
+            transform: translateY(-2px);
+            box-shadow:
+                0 6px 20px rgba(78, 205, 196, 0.3),
+                0 4px 8px rgba(0, 0, 0, 0.3);
+        }
+
+        .btn-comparison {
+            background: rgba(102, 126, 234, 0.15);
+            color: #8a9ef5;
+            border-color: rgba(102, 126, 234, 0.3);
+        }
+
+        .btn-comparison:hover {
+            background: rgba(102, 126, 234, 0.25);
+            color: #a3b3f7;
+            border-color: rgba(102, 126, 234, 0.5);
+            transform: translateY(-2px);
+            box-shadow:
+                0 6px 20px rgba(102, 126, 234, 0.3),
+                0 4px 8px rgba(0, 0, 0, 0.3);
+        }
+
+        button:disabled {
+            background: #2a2a3a;
+            color: #606060;
+            cursor: not-allowed;
+            transform: none;
+            box-shadow: none;
+        }
+
+        button:active:not(:disabled) {
+            transform: translateY(0);
+        }
+
+        .status-message {
+            margin-top: 16px;
+            padding: 12px 16px;
+            border-radius: 10px;
+            display: none;
+            font-size: 14px;
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
+        }
+
+        .status-message.success {
+            background: rgba(34, 197, 94, 0.15);
+            color: #4ade80;
+            border: 1px solid rgba(34, 197, 94, 0.3);
+        }
+
+        .status-message.error {
+            background: rgba(239, 68, 68, 0.15);
+            color: #f87171;
+            border: 1px solid rgba(239, 68, 68, 0.3);
+        }
+
+        .status-message.info {
+            background: rgba(59, 130, 246, 0.15);
+            color: #60a5fa;
+            border: 1px solid rgba(59, 130, 246, 0.3);
+        }
+
+        .response-item {
+            background: rgba(15, 15, 35, 0.4);
+            padding: 16px;
+            border-radius: 10px;
+            margin-bottom: 12px;
+            border-left: 3px solid #667eea;
+            box-shadow:
+                0 2px 8px rgba(0, 0, 0, 0.3),
+                inset 0 1px 0 rgba(255, 255, 255, 0.03);
+            transition: all 0.2s;
+        }
+
+        .response-item:hover {
+            background: rgba(15, 15, 35, 0.6);
+            transform: translateX(4px);
+        }
+
+        .response-item.rabbitmq {
+            border-left-color: #ff6b35;
+        }
+
+        .response-item.sqs {
+            border-left-color: #4ecdc4;
+        }
+
+        .response-item strong {
+            color: #ffffff;
+            font-size: 0.95em;
+        }
+
+        .response-item p {
+            margin: 6px 0;
+            color: #b0b0b0;
+            font-size: 0.9em;
+        }
+
+        .loading {
+            display: inline-block;
+            width: 20px;
+            height: 20px;
+            border: 3px solid rgba(255, 255, 255, .2);
+            border-radius: 50%;
+            border-top-color: #fff;
+            animation: spin 1s ease-in-out infinite;
+        }
+
+        @keyframes spin {
+            to {
+                transform: rotate(360deg);
+            }
+        }
+
+        .comparison-table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 20px;
+        }
+
+        .comparison-table th,
+        .comparison-table td {
+            padding: 14px 16px;
+            text-align: left;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+        }
+
+        .comparison-table th {
+            background: rgba(15, 15, 35, 0.6);
+            color: #ffffff;
+            font-weight: 600;
+            font-size: 0.9em;
+            letter-spacing: 0.5px;
+            text-transform: uppercase;
+        }
+
+        .comparison-table td {
+            color: #b0b0b0;
+            font-size: 0.95em;
+        }
+
+        .comparison-table tr {
+            transition: background 0.2s;
+        }
+
+        .comparison-table tbody tr:hover {
+            background: rgba(102, 126, 234, 0.08);
+        }
+
+        .stats {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+            gap: 16px;
+            margin-top: 20px;
+        }
+
+        .stat-card {
+            background: rgba(15, 15, 35, 0.4);
+            padding: 20px;
+            border-radius: 12px;
+            text-align: center;
+            border: 1px solid rgba(255, 255, 255, 0.08);
+            box-shadow:
+                0 4px 12px rgba(0, 0, 0, 0.3),
+                inset 0 1px 0 rgba(255, 255, 255, 0.05);
+            transition: all 0.3s;
+        }
+
+        .stat-card:hover {
+            transform: translateY(-3px);
+            box-shadow:
+                0 8px 20px rgba(0, 0, 0, 0.4),
+                inset 0 1px 0 rgba(255, 255, 255, 0.08);
+        }
+
+        .stat-card h3 {
+            color: #a0a0a0;
+            font-size: 0.85em;
+            margin-bottom: 8px;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+        }
+
+        .stat-card p {
+            font-size: 28px;
+            font-weight: 700;
+            color: #ffffff;
+            letter-spacing: -0.5px;
+        }
+
+        @media (max-width: 768px) {
+            .main-grid {
+                grid-template-columns: 1fr;
+            }
+
+            h1 {
+                font-size: 2em;
+            }
+
+            .card {
+                padding: 20px;
+            }
+        }
+    </style>
+</head>
+
+<body>
+    <div class="container">
+        <h1>Ride Request App - Performance Comparison</h1>
+
+        <div class="main-grid">
+            <!-- Request Form -->
+            <div class="card">
+                <h2>Request a Ride</h2>
+                <form id="rideForm">
+                    <div class="form-group">
+                        <label for="passenger_name">Passenger Name:</label>
+                        <input type="text" id="passenger_name" required placeholder="John Doe">
+                    </div>
+
+                    <div class="form-group">
+                        <label for="current_address">Current Address:</label>
+                        <input type="text" id="current_address" required placeholder="123 Main St, City, State">
+                    </div>
+
+                    <div class="form-group">
+                        <label for="destination">Destination:</label>
+                        <input type="text" id="destination" required placeholder="456 Oak Ave, City, State">
+                    </div>
+
+                    <div class="form-group">
+                        <label for="phoneNumber">Phone Number:</label>
+                        <input type="tel" id="phoneNumber" required placeholder="+1234567890">
+                    </div>
+
+                    <div class="button-group">
+                        <button type="button" class="btn-rabbitmq" onclick="requestRide('rabbitmq')">
+                            Send via RabbitMQ
+                        </button>
+                        <button type="button" class="btn-sqs" onclick="requestRide('sqs')">
+                            Send via SQS
+                        </button>
+                    </div>
+
+                    <div id="requestStatus" class="status-message"></div>
+                </form>
+            </div>
+
+            <!-- Recent Responses -->
+            <div class="card">
+                <h2>Recent Responses</h2>
+                <div id="recentResponses">
+                    <p style="color: #999; text-align: center;">No responses yet. Submit a ride request to see results.
+                    </p>
+                </div>
+            </div>
+
+            <!-- Performance Comparison -->
+            <div class="card full-width">
+                <h2>Performance Comparison</h2>
+                <button class="btn-comparison" onclick="fetchComparison()" style="width: 200px;">
+                    Load Comparison Data
+                </button>
+
+                <div id="comparisonStatus" class="status-message"></div>
+
+                <div id="comparisonStats" class="stats" style="display: none;">
+                    <div class="stat-card">
+                        <h3>RabbitMQ Avg Latency</h3>
+                        <p id="rabbitmqAvg">-</p>
+                    </div>
+                    <div class="stat-card">
+                        <h3>SQS Avg Latency</h3>
+                        <p id="sqsAvg">-</p>
+                    </div>
+                    <div class="stat-card">
+                        <h3>Total Requests</h3>
+                        <p id="totalRequests">-</p>
+                    </div>
+                    <div class="stat-card">
+                        <h3>Success Rate</h3>
+                        <p id="successRate">-</p>
+                    </div>
+                </div>
+
+                <div id="comparisonResults"></div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // ===== CONFIGURATION =====
+        // Replace this with your actual API Gateway URL
+        const API_GATEWAY_URL = 'https://clmtlmde81.execute-api.us-east-1.amazonaws.com/prod';
+        // Example: const API_GATEWAY_URL = 'https://abc123.execute-api.us-east-1.amazonaws.com/prod';
+        // ========================
+
+        // Store responses
+        let responses = [];
+
+        // Request a ride
+        async function requestRide(queueType) {
+            if (API_GATEWAY_URL === 'YOUR_API_GATEWAY_URL_HERE') {
+                showStatus('requestStatus', 'Please set your API_GATEWAY_URL in the script section of this HTML file.', 'error');
+                return;
+            }
+
+            const apiUrl = API_GATEWAY_URL;
+
+            const passenger_name = document.getElementById('passenger_name').value;
+            const current_address = document.getElementById('current_address').value;
+            const destination = document.getElementById('destination').value;
+            const phoneNumber = document.getElementById('phoneNumber').value;
+
+            if (!passenger_name || !current_address || !destination || !phoneNumber) {
+                showStatus('requestStatus', 'Please fill in all fields.', 'error');
+                return;
+            }
+
+            const requestData = {
+                passenger_name,
+                current_address,
+                destination,
+                phoneNumber,
+                timestamp: new Date().toISOString()
+            };
+
+            // Debug: Log what we're sending
+            console.log('Sending request data:', requestData);
+            console.log('To URL:', `${apiUrl}/request-ride?queue=${queueType}`);
+
+            showStatus('requestStatus', `Sending request via ${queueType.toUpperCase()}...`, 'info');
+
+            try {
+                const response = await fetch(`${apiUrl}/request-ride?queue=${queueType}`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify(requestData)
+                });
+
+                const data = await response.json();
+
+                // Debug: Log the response
+                console.log('Response status:', response.status);
+                console.log('Response data:', data);
+
+                if (response.ok) {
+                    showStatus('requestStatus', `✓ Request sent successfully via ${queueType.toUpperCase()}!`, 'success');
+
+                    // Add to responses
+                    const responseData = {
+                        queueType,
+                        ...data,
+                        timestamp: new Date().toISOString()
+                    };
+                    responses.unshift(responseData);
+                    updateRecentResponses();
+                } else {
+                    const errorMsg = data.error || data.message || 'Failed to send request';
+                    console.error('API Error:', errorMsg);
+                    showStatus('requestStatus', `Error: ${errorMsg}`, 'error');
+                }
+            } catch (error) {
+                console.error('Network/Fetch Error:', error);
+                showStatus('requestStatus', `Network error: ${error.message}. Check console for details.`, 'error');
+            }
+        }
+
+        // Update recent responses display
+        function updateRecentResponses() {
+            const container = document.getElementById('recentResponses');
+
+            if (responses.length === 0) {
+                container.innerHTML = '<p style="color: #999; text-align: center;">No responses yet. Submit a ride request to see results.</p>';
+                return;
+            }
+
+            container.innerHTML = responses.slice(0, 5).map(response => `
+                <div class="response-item ${response.queueType}">
+                    <strong>${response.queueType.toUpperCase()}</strong>
+                    ${response.messageId ? `<p><strong>Message ID:</strong> ${response.messageId}</p>` : ''}
+                    ${response.latency ? `<p><strong>Latency:</strong> ${response.latency} ms</p>` : ''}
+                    ${response.receivedAt ? `<p><strong>Received:</strong> ${new Date(response.receivedAt).toLocaleTimeString()}</p>` : ''}
+                    ${response.status ? `<p><strong>Status:</strong> ${response.status}</p>` : ''}
+                    ${response.timestamp ? `<p><strong>Sent:</strong> ${new Date(response.timestamp).toLocaleTimeString()}</p>` : ''}
+                </div>
+            `).join('');
+        }
+
+        // Fetch comparison data
+        async function fetchComparison() {
+            if (API_GATEWAY_URL === 'YOUR_API_GATEWAY_URL_HERE') {
+                showStatus('comparisonStatus', 'Please set your API_GATEWAY_URL in the script section of this HTML file.', 'error');
+                return;
+            }
+
+            const apiUrl = API_GATEWAY_URL;
+
+            showStatus('comparisonStatus', 'Loading comparison data...', 'info');
+
+            try {
+                // Add details=true to get individual messages
+                const response = await fetch(`${apiUrl}/comparison?details=true`);
+                const data = await response.json();
+
+                // Debug: Log the response
+                console.log('Comparison response:', data);
+
+                if (response.ok) {
+                    showStatus('comparisonStatus', '✓ Comparison data loaded successfully!', 'success');
+                    displayComparisonData(data);
+                } else {
+                    showStatus('comparisonStatus', `Error: ${data.error || 'Failed to fetch comparison data'}`, 'error');
+                }
+            } catch (error) {
+                console.error('Error:', error);
+                showStatus('comparisonStatus', `Network error: ${error.message}`, 'error');
+            }
+        }
+
+        // Display comparison data
+        function displayComparisonData(data) {
+            const statsDiv = document.getElementById('comparisonStats');
+            const resultsDiv = document.getElementById('comparisonResults');
+
+            console.log('Displaying comparison data:', data);
+
+            if (!data.messages || data.messages.length === 0) {
+                resultsDiv.innerHTML = '<p style="color: #999; text-align: center; margin-top: 20px;">No comparison data available yet. Send some ride requests first!</p>';
+                statsDiv.style.display = 'none';
+                return;
+            }
+
+            // Use statistics from API if available, otherwise calculate
+            let rabbitmqAvg, sqsAvg, totalRequests, successRate;
+
+            if (data.statistics) {
+                // Use the statistics provided by the API
+                rabbitmqAvg = data.statistics.rabbitmq ? data.statistics.rabbitmq.latency.avg_ms.toFixed(2) : 'N/A';
+                sqsAvg = data.statistics.sqs ? data.statistics.sqs.latency.avg_ms.toFixed(2) : 'N/A';
+                totalRequests = data.total_messages || data.messages.length;
+
+                const totalSuccess = (data.statistics.rabbitmq?.successful_count || 0) + (data.statistics.sqs?.successful_count || 0);
+                successRate = ((totalSuccess / totalRequests) * 100).toFixed(1);
+            } else {
+                // Fallback: calculate from messages
+                const rabbitmqMessages = data.messages.filter(m => m.queue_type === 'rabbitmq');
+                const sqsMessages = data.messages.filter(m => m.queue_type === 'sqs');
+
+                rabbitmqAvg = rabbitmqMessages.length > 0
+                    ? (rabbitmqMessages.reduce((sum, m) => sum + m.latency_ms, 0) / rabbitmqMessages.length).toFixed(2)
+                    : 'N/A';
+
+                sqsAvg = sqsMessages.length > 0
+                    ? (sqsMessages.reduce((sum, m) => sum + m.latency_ms, 0) / sqsMessages.length).toFixed(2)
+                    : 'N/A';
+
+                const successCount = data.messages.filter(m => m.status === 'successful').length;
+                totalRequests = data.messages.length;
+                successRate = ((successCount / totalRequests) * 100).toFixed(1);
+            }
+
+            // Update stats
+            document.getElementById('rabbitmqAvg').textContent = rabbitmqAvg !== 'N/A' ? `${rabbitmqAvg} ms` : rabbitmqAvg;
+            document.getElementById('sqsAvg').textContent = sqsAvg !== 'N/A' ? `${sqsAvg} ms` : sqsAvg;
+            document.getElementById('totalRequests').textContent = totalRequests;
+            document.getElementById('successRate').textContent = `${successRate}%`;
+            statsDiv.style.display = 'grid';
+
+            // Create table - handle both snake_case and camelCase
+            resultsDiv.innerHTML = `
+                <table class="comparison-table">
+                    <thead>
+                        <tr>
+                            <th>Queue Type</th>
+                            <th>Message ID</th>
+                            <th>Latency (ms)</th>
+                            <th>Processing (ms)</th>
+                            <th>Status</th>
+                            <th>Received At</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        ${data.messages.slice(0, 20).map(msg => {
+                const queueType = msg.queue_type || msg.queueType;
+                const messageId = msg.message_id || msg.messageId;
+                const latency = msg.latency_ms || msg.latency;
+                const processingTime = msg.processing_time_ms || msg.processingTime || 'N/A';
+                const status = msg.status;
+                const receivedAt = msg.timestamp_received || msg.receivedAt;
+
+                return `
+                            <tr>
+                                <td><strong style="color: ${queueType === 'rabbitmq' ? '#ff6b35' : '#4ecdc4'}">${queueType.toUpperCase()}</strong></td>
+                                <td style="font-family: monospace; font-size: 12px;">${messageId.substring(0, 20)}...</td>
+                                <td><strong>${latency.toFixed(2)}</strong></td>
+                                <td>${typeof processingTime === 'number' ? processingTime.toFixed(2) : processingTime}</td>
+                                <td>${status === 'successful' ? '✓' : '✗'} ${status}</td>
+                                <td>${new Date(receivedAt).toLocaleString()}</td>
+                            </tr>
+                        `}).join('')}
+                    </tbody>
+                </table>
+                ${data.messages.length > 20 ? `<p style="text-align: center; color: #666; margin-top: 10px;">Showing 20 of ${data.messages.length} messages</p>` : ''}
+            `;
+        }
+
+        // Show status message
+        function showStatus(elementId, message, type) {
+            const statusDiv = document.getElementById(elementId);
+            statusDiv.textContent = message;
+            statusDiv.className = `status-message ${type}`;
+            statusDiv.style.display = 'block';
+
+            if (type === 'success') {
+                setTimeout(() => {
+                    statusDiv.style.display = 'none';
+                }, 5000);
+            }
+        }
+
+    </script>
+</body>
+
+</html>
