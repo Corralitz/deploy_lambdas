@@ -62,6 +62,9 @@ deploy_function() {
     echo -e "${YELLOW}Deploying: $FUNC_NAME${NC}"
     echo -e "${YELLOW}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
     
+    # Save original directory
+    ORIGINAL_DIR=$(pwd)
+    
     # Navigate to function directory
     cd "$DIR"
     echo "Working directory: $(pwd)"
@@ -132,8 +135,8 @@ deploy_function() {
     # Cleanup
     rm -rf build deployment.zip
     
-    # Return to project root
-    cd - > /dev/null
+    # Return to original directory
+    cd "$ORIGINAL_DIR"
     echo ""
 }
 
