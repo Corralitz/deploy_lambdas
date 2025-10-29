@@ -44,6 +44,9 @@ deploy_lambda() {
     echo -e "${YELLOW}Deploying: $FUNCTION_NAME${NC}"
     echo -e "${YELLOW}========================================${NC}"
     
+    # Save current directory
+    ORIGINAL_DIR=$(pwd)
+    
     # Create deployment package
     cd $DIR
     
@@ -54,6 +57,7 @@ deploy_lambda() {
     # Install dependencies if requirements.txt exists
     if [ -f "requirements.txt" ]; then
         echo "Installing dependencies..."
+        pip install -r requirements.txt -t package/ --quiet --break-system-packages 2>/dev/null || \
         pip install -r requirements.txt -t package/ --quiet
     fi
     
@@ -100,7 +104,8 @@ deploy_lambda() {
     
     echo -e "${GREEN}✓ $FUNCTION_NAME deployed successfully${NC}"
     
-    cd - > /dev/null
+    # Return to original directory
+    cd "$ORIGINAL_DIR"
 }
 
 # Deploy Producer Lambda
